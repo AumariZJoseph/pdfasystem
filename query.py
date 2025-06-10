@@ -10,19 +10,23 @@ load_dotenv()
 
 class QASystem:
     def __init__(self):
-        self.llm = GroqLLM(model="llama3-8b-8192", temperature=0.3)
+        # Updated initialization
+        self.llm = Groq(model="meta-llama/llama-4-scout-17b-16e-instruct", temperature=0.3)
         self.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
         self.index = self._load_index()
         
     def _load_index(self):
-        storage_context = StorageContext.from_defaults(
-            persist_dir="storage",
-            vector_store=FaissVectorStore.from_persist_dir("storage")
-        )
-        return load_index_from_storage(
-            storage_context,
-            embed_model=self.embed_model
-        )
+        try:
+            storage_context = StorageContext.from_defaults(
+                persist_dir="storage",
+                vector_store=FaissVectorStore.from_persist_dir("storage")
+            )
+            return load_index_from_storage(
+                storage_context,
+                embed_model=self.embed_model
+            )
+        except Exception as e:
+            raise RuntimeError(f"Failed to load index: {str(e)}")
     
     def ask(self, question):
         qa_prompt = PromptTemplate(
