@@ -1,8 +1,6 @@
 import os
-from groq import Groq
 from dotenv import load_dotenv
-from llama_index.core import StorageContext, load_index_from_storage
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.core import StorageContext, VectorStoreIndex
 from llama_index.vector_stores.faiss import FaissVectorStore
 from llama_index.llms.groq import Groq as GroqLLM
 from llama_index.core import PromptTemplate
@@ -11,8 +9,7 @@ load_dotenv()
 
 class QASystem:
     def __init__(self):
-        self.llm = GroqLLM(model="meta-llama/llama-4-scout-17b-16e-instruct", temperature=0.3)
-        self.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
+        self.llm = GroqLLM(model="llama3-70b-8192", temperature=0.3)
         self.index = self._load_index()
         
     def _load_index(self):
@@ -20,62 +17,63 @@ class QASystem:
             persist_dir="storage",
             vector_store=FaissVectorStore.from_persist_dir("storage")
         )
-        return load_index_from_storage(
-            storage_context,
-            embed_model=self.embed_model
+        return VectorStoreIndex.from_vector_store(
+            storage_context.vector_store, 
+            storage_context=storage_context
         )
     
     def ask(self, question):
+        # Custom prompt with source awareness
         qa_prompt = PromptTemplate(
-            "Context information from multiple sources:\n"
+            "You are an expert document analyst. Given information from multiple sources:\n"
             "----------------\n"
             "{context_str}\n"
             "----------------\n"
-            "Given this information, answer the question: {query_str}\n"
-            "Structure your answer as:\n"
-            "1. Main answer\n"
-            "2. Sources (list document names)\n"
+            "Answer the question: {query_str}\n"
+            "Structure your response with:\n"
+            "1. A concise main answer\n"
+            "2. Source attribution using the document names\n"
+            "3. Key supporting evidence\n"
             "Answer:"
         )
         
-# Retrieve with metadata
-        retriever = self.index.as_retriever(similarity_top_k=3)
+        # Retrieve relevant context with metadata
+        retriever = self.index.as_retriever(similarity_top_k=4)
         context_nodes = retriever.retrieve(question)
         
-        # Format context with sources
+        # Format context with source markers
         context_str = ""
         for i, node in enumerate(context_nodes):
             source = node.metadata.get("source", "Unknown Document")
-            context_str += f"[Source {i+1}: {source}]\n{node.text}\n\n"
+            context_str += f"[Document: {source}]\n{node.text}\n\n"
         
         # Generate answer with source attribution
-        response = self.llm.complete(
-            qa_prompt.format(context_str=context_str, query_str=question)
-        )
+        llm_response = self.llm.complete(
+            qa_prompt.format(context_str=context_str, query_str=question)  # Fixed parenthesis here
         
-        # Extract sources
-        sources = {node.metadata.get("source", "Unknown") for node in context_nodes}
-        source_list = "\n- " + "\n- ".join(sources)
+        # Extract and format sources
+        sources = {node.metadata.get("source", "Unknown Document") 
+                  for node in context_nodes}
+        source_list = "\n".join([f"• {source}" for source in sources])
         
-        return f"{response.text}\n\nSources:{source_list}"
+        # Final formatted response
+        return f"{llm_response.text}\n\n🔍 Source Documents:\n{source_list}"
 
-
-        
-        query_engine = self.index.as_query_engine(
-            similarity_top_k=3,
-            llm=self.llm,
-            text_qa_template=qa_prompt,
-            streaming=False
-        )
-        response = query_engine.query(question)
-        return response.response
+def main():  # Properly indented function
+    qa = QASystem()
+    print("Document QA System - Type 'exit' to quit\n")
+    
+    while True:
+        question = input("\nQuestion: ")
+        if question.lower() in ['exit', 'quit', 'q']:
+            break
+            
+        print("\nProcessing...")
+        try:
+            answer = qa.ask(question)
+            print(f"\nAnswer:\n{answer}")
+        except Exception as e:
+            print(f"\n⚠️ Error: {str(e)}")
 
 if __name__ == "__main__":
-    qa = QASystem()
-    while True:
-        question = input("\nAsk a question (q to quit): ")
-        if question.lower() == "q":
-            break
-        print("\nThinking...")
-        answer = qa.ask(question)
-        print(f"\nAnswer: {answer}")
+    main()  # Correctly placed
