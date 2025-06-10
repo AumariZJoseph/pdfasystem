@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 from llama_index.core import StorageContext, load_index_from_storage
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.vector_stores.faiss import FaissVectorStore
-from llama_index.llms.groq import Groq  # Correct import
+from llama_index.llms.groq import Groq 
 from llama_index.core import PromptTemplate
 
 load_dotenv()
