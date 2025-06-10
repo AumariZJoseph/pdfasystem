@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from llama_index.core import StorageContext, load_index_from_storage
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.vector_stores.faiss import FaissVectorStore
-from llama_index.llms.groq import Groq as GroqLLM
+from llama_index.llms.groq import Groq
 from llama_index.core import PromptTemplate
 
 load_dotenv()
@@ -24,6 +24,9 @@ class QASystem:
             storage_context,
             embed_model=self.embed_model
         )
+ except Exception as e:
+            raise RuntimeError(f"Failed to load index: {str(e)}")
+
     
     def ask(self, question):
         qa_prompt = PromptTemplate(
