@@ -1,6 +1,7 @@
+streamlit
+groq>=0.5.0
 llama-index-core>=0.10.0
 llama-index-embeddings-huggingface>=0.1.0
 llama-index-vector-stores-faiss>=0.1.0
 faiss-cpu>=1.7.4
 python-dotenv>=1.0.0
-groq>=0.5.0
