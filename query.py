@@ -1,5 +1,4 @@
 import os
-from groq import Groq
 from dotenv import load_dotenv
 from llama_index.core import StorageContext, load_index_from_storage
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
@@ -41,12 +40,3 @@ class QASystem:
         response = query_engine.query(question)
         return response.response
 
-if __name__ == "__main__":
-    qa = QASystem()
-    while True:
-        question = input("\nAsk a question (q to quit): ")
-        if question.lower() == "q":
-            break
-        print("\nThinking...")
-        answer = qa.ask(question)
-        print(f"\nAnswer: {answer}")
