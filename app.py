@@ -32,10 +32,8 @@ for file in existing_files:
         os.remove(os.path.join(DATA_DIR, file))
         st.rerun()
 
-# File upload section with proper state reset
+# File upload section
 st.sidebar.subheader("Add Documents")
-
-# Use a separate key to track uploader state
 if 'uploader_key' not in st.session_state:
     st.session_state.uploader_key = 0
 
@@ -50,17 +48,13 @@ if uploaded_file:
     save_path = os.path.join(DATA_DIR, uploaded_file.name)
     with open(save_path, "wb") as f:
         f.write(uploaded_file.getbuffer())
-    # Increment key to reset uploader
     st.session_state.uploader_key += 1
     st.rerun()
 
 # --- Always Visible Rebuild Button ---
 st.sidebar.header("🛠️ Knowledge Base")
-
-# Get current file state
 has_files = len(os.listdir(DATA_DIR)) > 0
 
-# Rebuild button with force-enable
 if st.sidebar.button(
     "🔨 Rebuild Knowledge Base",
     disabled=not has_files,
@@ -72,9 +66,12 @@ if st.sidebar.button(
             if os.path.exists(STORAGE_DIR):
                 shutil.rmtree(STORAGE_DIR)
             
-            # Clear cache and re-ingest
-            init_qa_system.clear()
+            # Re-ingest data
             ingest_data()
+            
+            # Clear QA system cache
+            init_qa_system.clear()
+            st.session_state.qa = init_qa_system()
             
             st.sidebar.success("✅ Knowledge base updated!")
             st.balloons()
@@ -87,7 +84,7 @@ st.title("📄 Document QA Assistant")
 # Status indicators
 if not has_files:
     st.warning("No documents uploaded. Add files using the sidebar. ➡️")
-elif not os.path.exists(STORAGE_DIR):
+elif not os.path.exists(STORAGE_DIR) or not qa.is_ready():
     st.success("✅ Documents ready! Click 'Rebuild Knowledge Base' to process")
 
 # Chat interface
@@ -95,7 +92,7 @@ question = st.chat_input("Ask about your documents...")
 if question:
     if not has_files:
         st.error("⚠️ Please upload documents first!")
-    elif not os.path.exists(STORAGE_DIR):
+    elif not qa.is_ready():
         st.error("⚠️ Please rebuild knowledge base first!")
     else:
         with st.chat_message("user"):
