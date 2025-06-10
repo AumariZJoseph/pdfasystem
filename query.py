@@ -24,8 +24,6 @@ class QASystem:
             storage_context,
             embed_model=self.embed_model
         )
- except Exception as e:
-            raise RuntimeError(f"Failed to load index: {str(e)}")
 
     
     def ask(self, question):
