@@ -3,7 +3,7 @@ import os
 import shutil
 from ingest import ingest_data
 from query import QASystem
-import m;tl
+import nltk
 
 
 nltk_data_dir = os.path.expanduser('~/.nltk_data')
