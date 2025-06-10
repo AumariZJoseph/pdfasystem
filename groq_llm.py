@@ -1,8 +1,7 @@
 # groq_llm.py
-from llama_index.core.base.llms.base import LLM
-from llama_index.core.base.llms.types import CompletionResponse, CompletionResponseGen
-from llama_index.core.base.llms.types import MessageRole
-from typing import List, Optional
+from llama_index.core.llms.base import LLM  # ✅ Fixed path
+from llama_index.core.llms.types import CompletionResponse, CompletionResponseGen
+from typing import Generator
 from groq import Groq
 
 class GroqLLM(LLM):
