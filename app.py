@@ -1,123 +1,123 @@
 import streamlit as st
 import os
 import shutil
-import time
 from ingest import ingest_data
 from query import QASystem
 
-# Configuration - use Streamlit's temp directories
+# Configuration
 DATA_DIR = "data"
 STORAGE_DIR = "storage"
-
-# Initialize session state
-if 'qa_system' not in st.session_state:
-    st.session_state.qa_system = None
-if 'knowledge_base_built' not in st.session_state:
-    st.session_state.knowledge_base_built = False
-if 'uploaded_files' not in st.session_state:
-    st.session_state.uploaded_files = []
 
 # Create directories if missing
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(STORAGE_DIR, exist_ok=True)
 
+# Initialize QA System
+@st.cache_resource
+def init_qa_system():
+    return QASystem()
+
+# Only initialize QA system if storage exists
+if os.path.exists(STORAGE_DIR) and os.listdir(STORAGE_DIR):
+    qa = init_qa_system()
+else:
+    qa = None
+
 # --- Sidebar: File Management ---
 st.sidebar.header("📂 File Management")
 
-# Display existing files
-st.sidebar.subheader("Current Documents")
-for i, file in enumerate(st.session_state.uploaded_files):
-    cols = st.sidebar.columns([4, 1])
-    cols[0].write(f"📄 {file['name']}")
-    if cols[1].button("🗑️", key=f"del_{i}"):
-        # Remove file from session state and disk
-        os.remove(os.path.join(DATA_DIR, file['name']))
-        st.session_state.uploaded_files.pop(i)
-        st.session_state.knowledge_base_built = False
-        st.rerun()
+# Use session state for file tracking
+if 'file_list' not in st.session_state:
+    st.session_state.file_list = os.listdir(DATA_DIR)
 
-# File upload
+# Display existing files with delete buttons
+st.sidebar.subheader("Current Documents")
+for file in st.session_state.file_list[:]:  # Iterate over copy
+    cols = st.sidebar.columns([4,1])
+    cols[0].write(f"📄 {file}")
+    if cols[1].button("🗑️", key=f"del_{file}"):
+        try:
+            os.remove(os.path.join(DATA_DIR, file))
+            st.session_state.file_list.remove(file)
+            st.rerun()
+        except Exception as e:
+            st.sidebar.error(f"Delete failed: {str(e)}")
+
+# File upload section
 st.sidebar.subheader("Add Documents")
 uploaded_file = st.sidebar.file_uploader(
     "Choose PDF/TXT file",
     type=["pdf", "txt"],
-    label_visibility="collapsed"
+    label_visibility="collapsed",
+    key="file_uploader"
 )
 
-if uploaded_file:
-    save_path = os.path.join(DATA_DIR, uploaded_file.name)
-    with open(save_path, "wb") as f:
-        f.write(uploaded_file.getbuffer())
-    
-    # Add to session state
-    st.session_state.uploaded_files.append({
-        "name": uploaded_file.name,
-        "size": uploaded_file.size,
-        "type": uploaded_file.type
-    })
-    st.session_state.knowledge_base_built = False
-    st.rerun()
+if uploaded_file is not None:
+    # Only process if it's a new file
+    if uploaded_file.name not in st.session_state.file_list:
+        save_path = os.path.join(DATA_DIR, uploaded_file.name)
+        with open(save_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        st.session_state.file_list.append(uploaded_file.name)
+        st.rerun()
 
-# --- Knowledge Base Management ---
+# --- Always Visible Rebuild Button ---
 st.sidebar.header("🛠️ Knowledge Base")
 
-# Rebuild button
-if st.sidebar.button("🔨 Rebuild Knowledge Base", 
-                    disabled=len(st.session_state.uploaded_files) == 0,
-                    help="Process current documents"):
-    with st.sidebar.status("📚 Analyzing documents...", expanded=True) as status:
+# Get current file state
+has_files = len(st.session_state.file_list) > 0
+
+# Rebuild button with force-enable
+if st.sidebar.button(
+    "🔨 Rebuild Knowledge Base",
+    disabled=not has_files,
+    help="Process current documents" if has_files else "Upload files first"
+):
+    with st.spinner("📚 Analyzing documents..."):
         try:
             # Clear existing storage
             if os.path.exists(STORAGE_DIR):
                 shutil.rmtree(STORAGE_DIR)
-                st.write("Cleared previous knowledge base")
+                os.makedirs(STORAGE_DIR, exist_ok=True)
             
-            # Ingest new data
-            st.write("Processing documents...")
+            # Clear cache and re-ingest
+            init_qa_system.clear()
             ingest_data()
             
-            # Initialize QA system
-            st.write("Initializing QA system...")
-            st.session_state.qa_system = QASystem()
-            st.session_state.knowledge_base_built = True
+            # Reinitialize QA system
+            qa = init_qa_system()
             
-            status.update(label="✅ Knowledge base updated!", state="complete")
+            st.sidebar.success("✅ Knowledge base updated!")
             st.balloons()
         except Exception as e:
-            status.update(label=f"❌ Error: {str(e)}", state="error")
-
-# System status
-st.sidebar.divider()
-st.sidebar.subheader("System Status")
-if st.session_state.uploaded_files:
-    st.sidebar.info(f"📄 {len(st.session_state.uploaded_files)} documents uploaded")
-else:
-    st.sidebar.warning("⚠️ No documents uploaded")
-    
-if st.session_state.knowledge_base_built:
-    st.sidebar.success("✅ Knowledge base ready")
-else:
-    st.sidebar.warning("⚠️ Knowledge base not built")
+            st.sidebar.error(f"❌ Error: {str(e)}")
 
 # --- Main Interface ---
 st.title("📄 Document QA Assistant")
 
+# Status indicators
+if not has_files:
+    st.warning("No documents uploaded. Add files using the sidebar. ➡️")
+elif not os.path.exists(STORAGE_DIR) or not os.listdir(STORAGE_DIR):
+    st.success("✅ Documents ready! Click 'Rebuild Knowledge Base' to process")
+
 # Chat interface
-if prompt := st.chat_input("Ask about your documents..."):
-    if not st.session_state.uploaded_files:
+question = st.chat_input("Ask about your documents...")
+if question:
+    if not has_files:
         st.error("⚠️ Please upload documents first!")
-    elif not st.session_state.knowledge_base_built:
+    elif not os.path.exists(STORAGE_DIR) or not os.listdir(STORAGE_DIR):
         st.error("⚠️ Please rebuild knowledge base first!")
+    elif qa is None:
+        st.error("⚠️ System not ready - please rebuild knowledge base")
     else:
-        # Display user message
         with st.chat_message("user"):
-            st.write(prompt)
+            st.write(question)
         
-        # Get response
         with st.chat_message("assistant"):
             with st.spinner("🤔 Thinking..."):
                 try:
-                    response = st.session_state.qa_system.ask(prompt)
-                    st.write(response)
+                    answer = qa.ask(question)
+                    st.write(answer)
                 except Exception as e:
                     st.error(f"⚠️ Error: {str(e)}")
