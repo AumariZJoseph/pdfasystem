@@ -43,3 +43,8 @@ def ingest_data():
     index.storage_context.persist(persist_dir="storage")
 
 
+if __name__ == "__main__":
+    ingest_data()
+    print("Data ingestion complete with source metadata!")
+
+
