@@ -1,10 +1,10 @@
 import os
-from groq import Groq
+from groq import Groq as GroqClient
 from dotenv import load_dotenv
 from llama_index.core import StorageContext, load_index_from_storage
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.vector_stores.faiss import FaissVectorStore
-from llama_index.llms.groq import GroqLLM
+from llama_index.llms.groq import Groq  # Updated import
 from llama_index.core import PromptTemplate
 import streamlit as st
 
@@ -12,7 +12,8 @@ load_dotenv()
 
 class QASystem:
     def __init__(self):
-        self.llm = GroqLLM(model="meta-llama/llama-4-scout-17b-16e-instruct", temperature=0.3)
+        # Use Groq instead of GroqLLM
+        self.llm = Groq(model="meta-llama/llama-4-scout-17b-16e-instruct", temperature=0.3)
         self.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
         self.index = None
         self._load_index()
